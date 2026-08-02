@@ -1,13 +1,15 @@
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, UTC
 import json
 from icp.gate import ICPGate
 
-PROJECT_ROOT = "/content/drive/MyDrive/clickpost-intent-engine"
+# Use pathlib for cross-platform compatibility
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # -----------------------------------------
 # Project Imports
@@ -51,7 +53,6 @@ if not api_key:
 if api_key:
     api_key = api_key.strip()
 
-
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY not found.")
 
@@ -84,43 +85,26 @@ CAREER_PATHS = [
     "/jobs",
 ]
 
-REDDIT_SOURCE_FILE = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "sources",
-    "reddit_urls.json",
-)
-
-PAGE_SOURCE_FILE = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "sources",
-    "page_urls.json",
-)
+REDDIT_SOURCE_FILE = PROJECT_ROOT / "data" / "sources" / "reddit_urls.json"
+PAGE_SOURCE_FILE = PROJECT_ROOT / "data" / "sources" / "page_urls.json"
 
 # -----------------------------------------
 # Load curated page URLs
 # -----------------------------------------
 
-print("\n" + "="*60)
-print("LOADING PAGE_URLS")
-print("="*60)
-
 PAGE_URLS = {}
 
-if os.path.exists(PAGE_SOURCE_FILE):
+if PAGE_SOURCE_FILE.exists():
     with open(PAGE_SOURCE_FILE, "r", encoding="utf-8") as f:
-        PAGE_URLS = json.load(f)else:
+        PAGE_URLS = json.load(f)
+else:
+    print("File does not exist!")
+
 # -----------------------------------------
-# Debug: Print BRANDS and PAGE_URLS
+# Collect scored accounts
 # -----------------------------------------
 
-print("\n" + "="*60)
-print("="*60)
-for b in BRANDS:
-print("\n" + "="*60)
-print("="*60)
-for k in PAGE_URLS.keys():print("="*60 + "\n")
+all_results = []
 
 # -----------------------------------------
 # Pipeline
@@ -131,25 +115,15 @@ for brand in BRANDS:
     brand_name = brand["name"]
     website = brand["website"]
 
-    # -----------------------------------------
-    # Debug: Check if brand is in PAGE_URLS
-    # -----------------------------------------
-    print("\n" + "="*60)    
-    if brand_name in PAGE_URLS:    else:        for k in PAGE_URLS.keys():
-            # Check if first word matches
-            brand_first_word = brand_name.lower().split()[0] if brand_name.lower().split() else ""
-            k_first_word = k.lower().split()[0] if k.lower().split() else ""
-            if brand_first_word in k.lower() or k_first_word in brand_name.lower():    print("="*60 + "\n")
-
     print("=" * 60)
     print(f"Processing {brand_name}")
     print("=" * 60)
 
-    raw_dir = os.path.join(PROJECT_ROOT, "data", "raw", brand_name)
-    extracted_dir = os.path.join(PROJECT_ROOT, "data", "extracted", brand_name)
-    verified_dir = os.path.join(PROJECT_ROOT, "data", "verified", brand_name)
-    scored_dir = os.path.join(PROJECT_ROOT, "data", "scored", brand_name)
-    outreach_dir = os.path.join(PROJECT_ROOT, "data", "outreach", brand_name)
+    raw_dir = PROJECT_ROOT / "data" / "raw" / brand_name
+    extracted_dir = PROJECT_ROOT / "data" / "extracted" / brand_name
+    verified_dir = PROJECT_ROOT / "data" / "verified" / brand_name
+    scored_dir = PROJECT_ROOT / "data" / "scored" / brand_name
+    outreach_dir = PROJECT_ROOT / "data" / "outreach" / brand_name
 
     for folder in [
         raw_dir,
@@ -158,7 +132,7 @@ for brand in BRANDS:
         scored_dir,
         outreach_dir,
     ]:
-        os.makedirs(folder, exist_ok=True)
+        folder.mkdir(parents=True, exist_ok=True)
 
     metadata = {
         "brand": brand_name,
@@ -175,7 +149,7 @@ for brand in BRANDS:
 
         result = None
 
-        # ---------- First try curated URL ----------        if brand_name in PAGE_URLS:        
+        # ---------- First try curated URL ----------
         if (
             brand_name in PAGE_URLS
             and PAGE_URLS[brand_name].get(page_type)
@@ -243,10 +217,7 @@ for brand in BRANDS:
         if result and result.get("success"):
 
             save_text(
-                os.path.join(
-                    raw_dir,
-                    f"{page_type}.txt",
-                ),
+                raw_dir / f"{page_type}.txt",
                 result["text"],
             )
 
@@ -266,15 +237,12 @@ for brand in BRANDS:
     )
 
     save_json(
-        os.path.join(raw_dir, "reddit.json"),
+        raw_dir / "reddit.json",
         posts,
     )
 
     save_json(
-        os.path.join(
-            raw_dir,
-            "reddit_fetch_errors.json",
-        ),
+        raw_dir / "reddit_fetch_errors.json",
         failures,
     )
 
@@ -298,14 +266,14 @@ for brand in BRANDS:
     returns_text = ""
     careers_text = ""
 
-    returns_file = os.path.join(raw_dir, "returns.txt")
-    careers_file = os.path.join(raw_dir, "careers.txt")
+    returns_file = raw_dir / "returns.txt"
+    careers_file = raw_dir / "careers.txt"
 
-    if os.path.exists(returns_file):
+    if returns_file.exists():
         with open(returns_file, "r", encoding="utf-8") as f:
             returns_text = f.read()
 
-    if os.path.exists(careers_file):
+    if careers_file.exists():
         with open(careers_file, "r", encoding="utf-8") as f:
             careers_text = f.read()
 
@@ -331,7 +299,7 @@ for brand in BRANDS:
         }
 
     save_json(
-        os.path.join(extracted_dir, "returns.json"),
+        extracted_dir / "returns.json",
         returns_extract,
     )
 
@@ -353,7 +321,7 @@ for brand in BRANDS:
         }
 
     save_json(
-        os.path.join(extracted_dir, "careers.json"),
+        extracted_dir / "careers.json",
         careers_extract,
     )
 
@@ -378,7 +346,7 @@ for brand in BRANDS:
         }
 
     save_json(
-        os.path.join(verified_dir, "returns.json"),
+        verified_dir / "returns.json",
         returns_verified,
     )
 
@@ -399,7 +367,7 @@ for brand in BRANDS:
         }
 
     save_json(
-        os.path.join(verified_dir, "careers.json"),
+        verified_dir / "careers.json",
         careers_verified,
     )
 
@@ -421,9 +389,6 @@ for brand in BRANDS:
         "error": merged_error,
     }
 
-            
-        
-            
     # -----------------------------------------
     # Score
     # -----------------------------------------
@@ -522,8 +487,14 @@ for brand in BRANDS:
         score_result["brand"]
     )
 
+    # -----------------------------------------
+    # Collect account for final ranking
+    # -----------------------------------------
+
+    all_results.append(score_result)
+
     save_json(
-        os.path.join(scored_dir, "intent_score.json"),
+        scored_dir / "intent_score.json",
         score_result,
     )
 
@@ -566,10 +537,7 @@ for brand in BRANDS:
         }
 
     save_json(
-        os.path.join(
-            outreach_dir,
-            "outreach.json",
-        ),
+        outreach_dir / "outreach.json",
         outreach_result,
     )
 
@@ -583,11 +551,23 @@ for brand in BRANDS:
     # -----------------------------------------
 
     save_json(
-        os.path.join(
-            raw_dir,
-            "metadata.json",
-        ),
+        raw_dir / "metadata.json",
         metadata,
     )
+
+# -----------------------------------------
+# Final Ranking
+# -----------------------------------------
+
+from ranking.ranker import Ranker
+
+ranker = Ranker()
+
+ranked_accounts = ranker.rank()
+
+output_file = ranker.save(ranked_accounts)
+
+print(f"\n✓ Ranked {len(ranked_accounts)} ICP-eligible accounts.")
+print(f"✓ Saved ranking to: {output_file}")
 
 print("\nDone!")
