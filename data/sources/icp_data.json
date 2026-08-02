@@ -1,0 +1,58 @@
+{
+  "Brooklinen": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Vuori": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Rothy's": {
+    "dtc": true,
+    "mid_market": false,
+    "physical_products": true,
+    "flagged_for_review": true,
+    "reason": "Public research indicates unicorn-scale valuation (~$1B), established retail footprint, and business scale that may exceed the target mid-market ICP."
+  },
+  "Solo Stove": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Blueland": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Caraway": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Graza": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Kosas": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  }
+}
