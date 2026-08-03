@@ -9,31 +9,12 @@ SIGNAL_WEIGHTS = {
     "carrier_partnership": 9,
 }
 
-
 class IntentScorer:
 
     def score(self, verification_result):
-
-        # -----------------------------------------
-        # Brand
-        # -----------------------------------------
-
         brand = verification_result.get("brand")
-
-        # -----------------------------------------
-        # Determine data status
-        # -----------------------------------------
-
         error = verification_result.get("error")
-
-        if error:
-            data_status = "INCOMPLETE"
-        else:
-            data_status = "COMPLETE"
-
-        # -----------------------------------------
-        # If verification failed, stop here
-        # -----------------------------------------
+        data_status = "INCOMPLETE" if error else "COMPLETE"
 
         if error:
             return {
@@ -46,29 +27,23 @@ class IntentScorer:
 
         total = 0
         accepted = []
-
-        # -----------------------------------------
-        # Score verified signals
-        # -----------------------------------------
+        seen_signal_types = set()
 
         for signal in verification_result.get("signals", []):
-
             signal_name = signal.get("signal")
 
+            # Skip additional occurrences of an already-counted category
+            if signal_name in seen_signal_types:
+                continue
+            seen_signal_types.add(signal_name)
+
             weight = SIGNAL_WEIGHTS.get(signal_name, 0)
-
             signal["weight"] = weight
-
             total += weight
-
             accepted.append(signal)
 
             if brand is None:
                 brand = signal.get("brand")
-
-        # -----------------------------------------
-        # Return score
-        # -----------------------------------------
 
         return {
             "brand": brand,
