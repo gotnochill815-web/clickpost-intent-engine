@@ -1,6 +1,7 @@
 import re
 
 VALID_SIGNALS = {
+    # Existing
     "shipping_issue",
     "delivery_issue",
     "returns_issue",
@@ -9,6 +10,11 @@ VALID_SIGNALS = {
     "hiring_customer_support",
     "warehouse_expansion",
     "carrier_partnership",
+
+    # New
+    "competitor_stack",
+    "growth_signal",
+    "trigger_event",
 }
 
 

@@ -1,3 +1,4 @@
+print("RUN_PIPELINE VERSION = ABOUT+PRESS+BLOG")
 import os
 import sys
 from pathlib import Path
@@ -85,6 +86,25 @@ CAREER_PATHS = [
     "/jobs",
 ]
 
+ABOUT_PATHS = [
+    "/about",
+    "/about-us",
+    "/pages/about",
+    "/pages/about-us",
+]
+
+PRESS_PATHS = [
+    "/press",
+    "/news",
+    "/media",
+]
+
+BLOG_PATHS = [
+    "/blog",
+    "/blogs",
+    "/blogs/news",
+]
+
 REDDIT_SOURCE_FILE = PROJECT_ROOT / "data" / "sources" / "reddit_urls.json"
 PAGE_SOURCE_FILE = PROJECT_ROOT / "data" / "sources" / "page_urls.json"
 
@@ -142,10 +162,16 @@ for brand in BRANDS:
     }
 
     # -----------------------------------------
-    # Fetch Returns & Careers Pages
+    # Fetch Returns, Careers, About, Press, & Blog Pages
     # -----------------------------------------
 
-    for page_type in ["returns", "careers"]:
+    for page_type in [
+        "returns",
+        "careers",
+        "about",
+        "press",
+        "blog",
+    ]:
 
         result = None
 
@@ -177,11 +203,16 @@ for brand in BRANDS:
 
         # ---------- Fallback to URL guessing ----------
         if result is None:            
-            candidate_paths = (
-                RETURN_PATHS
-                if page_type == "returns"
-                else CAREER_PATHS
-            )
+            if page_type == "returns":
+                candidate_paths = RETURN_PATHS
+            elif page_type == "careers":
+                candidate_paths = CAREER_PATHS
+            elif page_type == "about":
+                candidate_paths = ABOUT_PATHS
+            elif page_type == "press":
+                candidate_paths = PRESS_PATHS
+            else:
+                candidate_paths = BLOG_PATHS
 
             result = find_first_working_page(
                 website,
@@ -265,9 +296,15 @@ for brand in BRANDS:
 
     returns_text = ""
     careers_text = ""
+    about_text = ""
+    press_text = ""
+    blog_text = ""
 
     returns_file = raw_dir / "returns.txt"
     careers_file = raw_dir / "careers.txt"
+    about_file = raw_dir / "about.txt"
+    press_file = raw_dir / "press.txt"
+    blog_file = raw_dir / "blog.txt"
 
     if returns_file.exists():
         with open(returns_file, "r", encoding="utf-8") as f:
@@ -276,6 +313,18 @@ for brand in BRANDS:
     if careers_file.exists():
         with open(careers_file, "r", encoding="utf-8") as f:
             careers_text = f.read()
+
+    if about_file.exists():
+        with open(about_file, "r", encoding="utf-8") as f:
+            about_text = f.read()
+
+    if press_file.exists():
+        with open(press_file, "r", encoding="utf-8") as f:
+            press_text = f.read()
+
+    if blog_file.exists():
+        with open(blog_file, "r", encoding="utf-8") as f:
+            blog_text = f.read()
 
     # -----------------------------------------
     # Extract
@@ -325,6 +374,72 @@ for brand in BRANDS:
         careers_extract,
     )
 
+    if about_text:
+        about_extract = extractor.extract(
+            brand_name,
+            about_text,
+            "about",
+        )
+        # Apply rule-based filtering to prevent model drift
+        about_extract["signals"] = filter_signals(
+            about_extract["signals"]
+        )
+    else:
+        about_extract = {
+            "brand": brand_name,
+            "signals": [],
+            "error": None,
+        }
+
+    save_json(
+        extracted_dir / "about.json",
+        about_extract,
+    )
+
+    if press_text:
+        press_extract = extractor.extract(
+            brand_name,
+            press_text,
+            "press",
+        )
+        # Apply rule-based filtering to prevent model drift
+        press_extract["signals"] = filter_signals(
+            press_extract["signals"]
+        )
+    else:
+        press_extract = {
+            "brand": brand_name,
+            "signals": [],
+            "error": None,
+        }
+
+    save_json(
+        extracted_dir / "press.json",
+        press_extract,
+    )
+
+    if blog_text:
+        blog_extract = extractor.extract(
+            brand_name,
+            blog_text,
+            "blog",
+        )
+        # Apply rule-based filtering to prevent model drift
+        blog_extract["signals"] = filter_signals(
+            blog_extract["signals"]
+        )
+    else:
+        blog_extract = {
+            "brand": brand_name,
+            "signals": [],
+            "error": None,
+        }
+
+    save_json(
+        extracted_dir / "blog.json",
+        blog_extract,
+    )
+
     # -----------------------------------------
     # Verify
     # -----------------------------------------
@@ -371,6 +486,69 @@ for brand in BRANDS:
         careers_verified,
     )
 
+    if (
+        about_text
+        and about_extract.get("signals")
+        and not about_extract.get("error")
+    ):
+        about_verified = verifier.verify(
+            about_extract,
+            about_text,
+        )
+    else:
+        about_verified = {
+            "brand": brand_name,
+            "signals": about_extract.get("signals", []),
+            "error": about_extract.get("error"),
+        }
+
+    save_json(
+        verified_dir / "about.json",
+        about_verified,
+    )
+
+    if (
+        press_text
+        and press_extract.get("signals")
+        and not press_extract.get("error")
+    ):
+        press_verified = verifier.verify(
+            press_extract,
+            press_text,
+        )
+    else:
+        press_verified = {
+            "brand": brand_name,
+            "signals": press_extract.get("signals", []),
+            "error": press_extract.get("error"),
+        }
+
+    save_json(
+        verified_dir / "press.json",
+        press_verified,
+    )
+
+    if (
+        blog_text
+        and blog_extract.get("signals")
+        and not blog_extract.get("error")
+    ):
+        blog_verified = verifier.verify(
+            blog_extract,
+            blog_text,
+        )
+    else:
+        blog_verified = {
+            "brand": brand_name,
+            "signals": blog_extract.get("signals", []),
+            "error": blog_extract.get("error"),
+        }
+
+    save_json(
+        verified_dir / "blog.json",
+        blog_verified,
+    )
+
     # -----------------------------------------
     # Merge
     # -----------------------------------------
@@ -378,6 +556,9 @@ for brand in BRANDS:
     merged_error = (
         returns_verified.get("error")
         or careers_verified.get("error")
+        or about_verified.get("error")
+        or press_verified.get("error")
+        or blog_verified.get("error")
     )
 
     merged = {
@@ -385,6 +566,9 @@ for brand in BRANDS:
         "signals": (
             returns_verified.get("signals", [])
             + careers_verified.get("signals", [])
+            + about_verified.get("signals", [])
+            + press_verified.get("signals", [])
+            + blog_verified.get("signals", [])
         ),
         "error": merged_error,
     }
@@ -404,6 +588,21 @@ for brand in BRANDS:
         None,
     )
 
+    about_meta = next(
+        (s for s in metadata["sources"] if s["type"] == "about"),
+        None,
+    )
+
+    press_meta = next(
+        (s for s in metadata["sources"] if s["type"] == "press"),
+        None,
+    )
+
+    blog_meta = next(
+        (s for s in metadata["sources"] if s["type"] == "blog"),
+        None,
+    )
+
     returns_success = (
         returns_meta is not None
         and returns_meta.get("success", False)
@@ -412,6 +611,21 @@ for brand in BRANDS:
     careers_success = (
         careers_meta is not None
         and careers_meta.get("success", False)
+    )
+
+    about_success = (
+        about_meta is not None
+        and about_meta.get("success", False)
+    )
+
+    press_success = (
+        press_meta is not None
+        and press_meta.get("success", False)
+    )
+
+    blog_success = (
+        blog_meta is not None
+        and blog_meta.get("success", False)
     )
 
     # -------------------------------------------------
@@ -436,6 +650,30 @@ for brand in BRANDS:
         else:
             fetch_errors.append("Careers page not found")
 
+    if not about_success:
+        if about_meta and about_meta.get("error"):
+            fetch_errors.append(
+                f"About page: {about_meta['error']}"
+            )
+        else:
+            fetch_errors.append("About page not found")
+
+    if not press_success:
+        if press_meta and press_meta.get("error"):
+            fetch_errors.append(
+                f"Press page: {press_meta['error']}"
+            )
+        else:
+            fetch_errors.append("Press page not found")
+
+    if not blog_success:
+        if blog_meta and blog_meta.get("error"):
+            fetch_errors.append(
+                f"Blog page: {blog_meta['error']}"
+            )
+        else:
+            fetch_errors.append("Blog page not found")
+
     # -------------------------------------------------
     # Score
     # -------------------------------------------------
@@ -450,9 +688,9 @@ for brand in BRANDS:
             "data_status": "EXTRACTION_FAILED",
         }
 
-    elif not returns_success and not careers_success:
+    elif not returns_success and not careers_success and not about_success and not press_success and not blog_success:
 
-        # Neither source could be fetched
+        # No sources could be fetched
 
         score_result = {
             "brand": brand_name,
@@ -571,3 +809,48 @@ print(f"\n✓ Ranked {len(ranked_accounts)} ICP-eligible accounts.")
 print(f"✓ Saved ranking to: {output_file}")
 
 print("\nDone!")
+
+# ---------------------------------------------------------
+# Save ranked accounts as CSV
+# ---------------------------------------------------------
+
+import pandas as pd
+
+# Create final directory if it doesn't exist
+final_dir = PROJECT_ROOT / "data" / "final"
+final_dir.mkdir(parents=True, exist_ok=True)
+
+rows = []
+
+for account in ranked_accounts:
+    rows.append({
+        "Brand": account.get("brand"),
+        "Score": account.get("score"),
+        "ICP Eligible": account.get("icp_eligible"),
+        "Data Status": account.get("data_status"),
+
+        "Signals": ", ".join(
+            s.get("signal", "")
+            for s in account.get("signals", [])
+        ),
+
+        "Sources": ", ".join(
+            sorted({
+                s.get("source", "")
+                for s in account.get("signals", [])
+                if s.get("source")
+            })
+        ),
+
+        "Evidence": " | ".join(
+            s.get("evidence", "")
+            for s in account.get("signals", [])
+        ),
+    })
+
+df = pd.DataFrame(rows)
+
+csv_path = PROJECT_ROOT / "data" / "final" / "ranked_accounts.csv"
+df.to_csv(csv_path, index=False)
+
+print(f"✓ Saved CSV to: {csv_path}")

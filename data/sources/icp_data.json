@@ -54,5 +54,33 @@
     "physical_products": true,
     "flagged_for_review": false,
     "reason": null
+  },
+  "Jones Road Beauty": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Liquid Death": {
+    "dtc": true,
+    "mid_market": false,
+    "physical_products": true,
+    "flagged_for_review": true,
+    "reason": "Large beverage brand with broad retail distribution and business scale that may exceed the target mid-market ICP."
+  },
+  "Our Place": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
+  },
+  "Magic Spoon": {
+    "dtc": true,
+    "mid_market": true,
+    "physical_products": true,
+    "flagged_for_review": false,
+    "reason": null
   }
 }

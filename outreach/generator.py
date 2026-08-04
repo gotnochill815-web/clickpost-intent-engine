@@ -1,16 +1,15 @@
 import json
 import logging
+
+from .prompts import OUTREACH_PROMPT
+
 logger = logging.getLogger(__name__)
+
+
 class OutreachGenerator:
 
     def __init__(self, client=None):
         self.client = client
-
-    def _build_observation(self, signal):
-        # Helper to extract signal description
-        signal_type = signal.get("signal")
-        evidence = signal.get("evidence", "").strip()
-        return evidence or signal_type
 
     def generate(self, scoring_result):
 
@@ -26,6 +25,7 @@ class OutreachGenerator:
             }
 
         brand = scoring_result.get("brand")
+        score = scoring_result.get("score", 0)
         signals = scoring_result.get("signals", [])
 
         if not signals:
@@ -36,70 +36,83 @@ class OutreachGenerator:
             }
 
         # -----------------------------------------
-        # Use highest-weight signal
+        # Keep only verified information
         # -----------------------------------------
 
-        signals = sorted(
-            signals,
-            key=lambda x: x.get("weight", 0),
-            reverse=True,
-        )
+        verified_signals = []
 
-        top_signal = signals[0]
-        signal_desc = self._build_observation(top_signal)
+        for signal in signals:
+            verified_signals.append(
+                {
+                    "signal": signal.get("signal"),
+                    "evidence": signal.get("evidence"),
+                    "source": signal.get("source"),
+                }
+            )
 
         # -----------------------------------------
-        # Generate personalized outreach with GPT
+        # Build prompt
+        # -----------------------------------------
+
+        prompt = f"""
+{OUTREACH_PROMPT}
+
+Brand:
+{brand}
+
+Intent Score:
+{score}
+
+Verified Signals:
+{json.dumps(verified_signals, indent=2)}
+"""
+
+        # -----------------------------------------
+        # GPT Generation
         # -----------------------------------------
 
         try:
-            prompt = f"""
-            Generate a personalized outreach email and LinkedIn message for {brand}.
-
-            Context: {brand} has a signal: {signal_desc}
-
-            ClickPost helps retail brands improve post-purchase operations through:
-            - Shipment tracking
-            - Proactive shipment notifications
-            - Carrier integrations
-            - Returns workflows
-
-            Generate:
-            1. A professional email with subject line
-            2. A short LinkedIn message
-
-            Return the response as a JSON object with "email" and "linkedin" fields.
-            """
 
             response = self.client.responses.create(
-                model="gpt-5.4-mini",
+                model="gpt-5-mini",
                 input=prompt,
-                temperature=0.7,
             )
 
-            result = json.loads(response.output_text)
+            output = response.output_text.strip()
+
+            print("========== MODEL OUTPUT ==========")
+            print(output)
+            print("==================================")
+
+            # Remove markdown fences if present
+            if output.startswith("```"):
+                output = output.replace("```json", "").replace("```", "").strip()
+
+            result = json.loads(output)
 
             return {
-                "email": result.get("email"),
-                "linkedin": result.get("linkedin"),
+                "email": f"Subject: {result['email']['subject']}\n\n{result['email']['body']}",
+                "linkedin": result["linkedin"],
                 "error": None,
             }
 
         except Exception as e:
-            # Fallback to template if GPT fails
-            logger.warning(f"GPT outreach failed, using template: {e}")
-            
-            subject = f"Supporting Post-Purchase Operations at {brand}"
-            
-            email = f"""Subject: {subject}
 
-Hi {brand} Team,
+            logger.warning(f"GPT outreach failed: {e}")
 
-I noticed {brand} {signal_desc}.
+            top = verified_signals[0]
 
-ClickPost helps retail brands improve post-purchase operations through shipment tracking, proactive shipment notifications, carrier integrations, and returns workflows.
+            subject = f"ClickPost for {brand}"
 
-If you're evaluating tools in this area, I'd be happy to share how ClickPost works.
+            body = f"""Hi {brand} Team,
+
+I noticed the following publicly available update:
+
+"{top['evidence']}"
+
+ClickPost helps retail brands improve post-purchase experiences through shipment tracking, proactive notifications, carrier integrations, and returns workflow automation.
+
+If you're evaluating solutions in this area, I'd be happy to share how ClickPost works.
 
 Would you be open to a brief conversation?
 
@@ -108,13 +121,13 @@ Best,
 """
 
             linkedin = (
-                f"Hi! I noticed {brand} {signal_desc}. "
-                "Thought ClickPost's post-purchase platform might be relevant. "
-                "Happy to connect and share more if useful."
+                f"Hi! I came across '{top['evidence']}' about {brand}. "
+                "Thought I'd reach out in case ClickPost's post-purchase platform is relevant. "
+                "Happy to connect!"
             )
 
             return {
-                "email": email,
+                "email": f"Subject: {subject}\n\n{body}",
                 "linkedin": linkedin,
-                "error": str(e) if str(e) else None,
+                "error": str(e),
             }

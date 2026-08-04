@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
 # ---------------------------------------------------------
 # HTTP Headers
 # ---------------------------------------------------------
@@ -55,5 +56,24 @@ BRANDS = [
     {
         "name": "Kosas",
         "website": "https://kosas.com",
+    },
+
+    # ---------------- New Brands ----------------
+
+    {
+        "name": "Jones Road Beauty",
+        "website": "https://www.jonesroadbeauty.com",
+    },
+    {
+        "name": "Liquid Death",
+        "website": "https://liquiddeath.com",
+    },
+    {
+        "name": "Our Place",
+        "website": "https://fromourplace.com",
+    },
+    {
+        "name": "Magic Spoon",
+        "website": "https://magicspoon.com",
     },
 ]

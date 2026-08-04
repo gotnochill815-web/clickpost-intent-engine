@@ -57,10 +57,13 @@ A buying intent signal is one of the following:
 • hiring activity
 • warehouse expansion
 • carrier/logistics partnership
+• logistics software / competitor stack
+• growth events
+• executive trigger events
 
 Not every signal requires operational pain.
 
-Hiring signals are valid by themselves.
+Hiring, growth, trigger events and competitor-stack signals are valid by themselves when explicitly supported by the document.
 
 --------------------------------------------------
 WHAT IS NOT A BUYING INTENT SIGNAL
@@ -116,7 +119,27 @@ Examples:
 
 ❌ "Free shipping over $100."
 
-These are standard customer policies.
+❌ "Please allow 3–5 business days for shipping."
+
+❌ "We do not accept returns because products are perishable."
+
+❌ "We'll make it right."
+
+❌ "If your order didn't arrive..."
+
+❌ "If your package is damaged..."
+
+❌ "Returns processed within 7 business days."
+
+❌ "We've diverted 1 billion plastic bottles."
+
+❌ "Head of Brand"
+
+❌ "Partnership with the NFL"
+
+❌ "In the event of returns being lost or delayed due to an unreadable barcode..."
+
+These are standard customer policies or irrelevant information.
 
 Do NOT classify them as:
 
@@ -124,6 +147,9 @@ Do NOT classify them as:
 - shipping_issue
 - delivery_issue
 - reverse_logistics
+- competitor_stack
+- growth_signal
+- trigger_event
 
 --------------------------------------------------
 ALLOWED SIGNALS
@@ -175,6 +201,9 @@ Never use for:
 - refund policies
 - exchange policies
 - standard return policy pages
+- customer responsibility statements
+- return eligibility rules
+- perishable-product return restrictions
 
 --------------------------------------------------
 
@@ -194,43 +223,63 @@ Never infer this from a return policy.
 
 5. hiring_logistics
 
-Use when the TARGET BRAND has an active job posting for:
+Use ONLY when the TARGET BRAND has an active job posting whose
+TITLE explicitly indicates logistics, fulfillment, warehouse,
+returns, transportation, distribution, supply chain, operations,
+or 3PL responsibilities.
 
-- logistics
-- warehouse
-- fulfillment
-- supply chain
-- transportation
-- operations
+Examples:
 
-The job posting itself is sufficient evidence.
+✓ Logistics Manager
+✓ Logistics Coordinator
+✓ Logistics Operations Manager
+✓ Supply Chain Manager
+✓ Supply Chain Analyst
+✓ Warehouse Manager
+✓ Warehouse Associate
+✓ Fulfillment Manager
+✓ Fulfillment Lead
+✓ Distribution Manager
+✓ Returns Manager
+✓ Returns Operations Manager
+✓ Inventory Manager
+✓ 3PL Analyst
+✓ Transportation Manager
+
+The job title itself is sufficient evidence.
 
 Do NOT require operational pain.
 
-Example:
+Do NOT infer logistics responsibility from generic engineering,
+manufacturing, production, quality assurance, finance,
+marketing, sales, product, or software roles.
 
-Evidence:
+Examples that MUST NOT be classified:
 
-"Logistics Coordinator"
-
-Output:
-
-{
-  "signal":"hiring_logistics",
-  "evidence":"Logistics Coordinator"
-}
+✗ Process Engineer
+✗ Manufacturing Engineer
+✗ Product Engineer
+✗ Software Engineer
+✗ QA Engineer
+✗ Quality Engineer
+✗ Mechanical Engineer
+✗ Director of Formulation
+✗ Product Manager
 
 --------------------------------------------------
 
 6. hiring_customer_support
 
-Use when the TARGET BRAND has an active job posting for:
+Use when the TARGET BRAND has an active job posting such as:
 
-- Customer Service
-- Customer Support
-- Customer Success
-- Customer Experience
-- Returns Support
+- Customer Experience Manager
+- Customer Success Manager
+- Customer Support Specialist
+- Customer Service Representative
+- Customer Operations Manager
+- CX Platform Lead
+- Returns Specialist
+- Customer Experience Lead
 
 The job title itself is sufficient evidence.
 
@@ -264,12 +313,113 @@ Use ONLY when the company explicitly announces:
 
 8. carrier_partnership
 
+Use ONLY when the company explicitly announces a partnership
+with a logistics, shipping, fulfillment, warehouse or logistics
+software company.
+
+Examples:
+
+- DHL
+- UPS
+- FedEx
+- USPS
+- ShipBob
+- Flexport
+- EasyPost
+- Narvar
+- Loop
+- AfterShip
+
+Do NOT classify:
+
+- sports partnerships
+- retail partnerships
+- influencer collaborations
+- sponsorships
+- marketing partnerships
+
+--------------------------------------------------
+
+9. competitor_stack
+
+Use ONLY when the TARGET BRAND explicitly mentions using,
+integrating with, migrating to/from, or requiring experience with
+a logistics or returns software platform.
+
+Examples include:
+
+- Loop
+- AfterShip
+- Narvar
+- Redo
+- Onward
+- Returnly
+- Happy Returns
+- ParcelLab
+- ShipStation
+- ShipBob
+- EasyPost
+
+Do NOT classify:
+
+- comparison pages
+- advertisements
+- generic mentions
+- unrelated blog articles
+
+--------------------------------------------------
+
+10. growth_signal
+
 Use ONLY when the company explicitly announces:
 
-- logistics partnerships
-- shipping partnerships
-- carrier partnerships
-- fulfillment partnerships
+- funding
+- Series A/B/C
+- acquisition
+- international expansion
+- geographic expansion
+- retail expansion
+- warehouse expansion
+- major new product line
+- manufacturing expansion
+
+Do NOT classify:
+
+- company history
+- founder story
+- sustainability statistics
+- mission statements
+- company introduction
+- "launched in 2013"
+- "founded in..."
+
+--------------------------------------------------
+
+11. trigger_event
+
+Use ONLY when the company explicitly announces the appointment
+or hiring of NEW senior leadership responsible for operations,
+customer experience, logistics, fulfillment, supply chain,
+or technology.
+
+Examples:
+
+✓ Appointed Chief Supply Chain Officer
+✓ Named VP Operations
+✓ Hired Head of Customer Experience
+✓ New CTO joins executive team
+✓ Appointed Head of Logistics
+
+Do NOT classify:
+
+✗ Founder biographies
+✗ Existing leadership pages
+✗ Team member profiles
+✗ Head of Brand
+✗ Director of Formulation
+✗ Creative Director
+✗ Marketing Director
+✗ Product Manager
 
 --------------------------------------------------
 DECISION CHECKLIST
@@ -293,6 +443,17 @@ an active job posting ALONE is sufficient evidence.
 Operational pain, complaints, delays or business problems are NOT required.
 
 4. The evidence matches EXACTLY ONE signal.
+
+5. The evidence is NOT:
+
+- a return policy
+- a shipping estimate
+- a FAQ heading
+- customer support instructions
+- company history
+- marketing language
+- sustainability claims
+- navigation text
 
 If any condition fails return
 
