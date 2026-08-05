@@ -372,3 +372,5 @@ GitHub:
 
 https://github.com/gotnochill815-web
 
+COLAB : https://colab.research.google.com/drive/18pcBM1uG5t35RWpY8OJJoiwyrUl9P09d?authuser=1#scrollTo=6QYsgU_4iiwg
+
