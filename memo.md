@@ -1,180 +1,128 @@
-# Technical Memo
-## ClickPost Intent-Based Account Prioritization Engine
 
-**Author:** Prakhya Khandelwal
 
----
-
-## 1. Overview
-
-This project develops an automated intent-based account prioritization system for ClickPost's outbound sales workflow. The objective is to rank direct-to-consumer (DTC) brands according to observable operational buying intent, using publicly available information such as returns policies, careers pages, and logistics-related documentation.
-
-Rather than relying on company size or generic firmographic data, the system attempts to identify operational signals that suggest logistics-related pain points or expansion activity. These signals are verified against their original source documents, scored using a deterministic weighting scheme, filtered through an Ideal Customer Profile (ICP) gate, and used to generate personalized outbound outreach only for qualified accounts.
-
-The final pipeline consists of eight sequential stages:
-
-**Fetch → Extract → Deterministic Filter → Verify → Score → ICP Gate → Rank → Outreach**
-
----
-
-## 2. Problem Statement
-
-Outbound sales teams commonly prioritize accounts using static criteria — company size, industry vertical, funding stage — that don't capture whether a company is *currently* exhibiting behavior consistent with demand for logistics software.
-
-This project's goal was to identify companies showing observable, evidence-backed logistics signals from public sources, while keeping false-positive rates from LLM extraction low enough that a sales rep could trust and act on the output directly.
-
----
-
-## 3. System Architecture
-
+Memo · MD
+# ClickPost Intent Capture & Outbound Activation — Technical Memo
+ 
+**Prepared by:** Prakhya Khandelwal
+ 
+## 1. What This Project Sets Out to Do
+ 
+The idea behind this project is fairly simple to state, even if it isn't simple to do well: instead of an SDR guessing which D2C brands might be worth reaching out to, can we look at public information — a returns policy, a careers page — and figure out, with actual evidence, whether a brand is showing signs that they'd benefit from ClickPost. Not "this company exists and fits the ICP," but "this company has a specific, checkable reason to talk to us right now."
+ 
+That distinction mattered a lot through this build. It's easy to build something that looks impressive and outputs a score for every brand. It's a lot harder to build something where you can point to the exact sentence on a company's website that justifies the score, and be confident that sentence actually means what you're claiming it means. Most of the real work in this project turned out to be in that second part.
+ 
+## 2. How We Defined Buying Intent
+ 
+Before writing any code, the first question was: what does "buying intent" even look like for a $5–100M GMV D2C brand whose CX Head or Founder might be evaluating ClickPost? We didn't want to fall into the trap of treating "company raised funding" as a proxy for buying intent — that's the exact generic signal the brief specifically calls out as unimpressive, and honestly, it's tempting to lean on because it's the easiest thing to find.
+ 
+So the taxonomy was built around a simple test: does this evidence point to actual operational strain in shipping, returns, or post-purchase experience — not just general company health. Signals were ranked by how directly they connect to that:
+ 
+- **Hiring for logistics roles** (3PL Analyst, Process Engineer, Warehouse roles) — a company doesn't create these roles unless there's real operational load to manage.
+- **Hiring for customer support/CX roles** — a slightly weaker version of the same idea; a growing support team can mean growing post-purchase friction.
+- **Returns-issue signals** — specific statements describing operational limitations in how returns are handled (not the return policy itself, but evidence of friction in it).
+- **Reverse logistics signals** — structured evidence of how a company manages the return-processing workflow itself.
+Things like funding announcements, retail expansion, and leadership hires outside CX/Ops were considered during development but deliberately left out of the final scoring. They're not irrelevant to a company's story, but they don't tell you anything specific about logistics pain, and including them would have meant scoring accounts on the exact kind of generic evidence this project was meant to move past.
+ 
+## 3. How the Pipeline Actually Works
+ 
+The final submitted pipeline pulls from two sources per brand — the returns/shipping policy page and the careers page — fetched directly via `requests` and `BeautifulSoup`, with an automatic fallback that follows careers pages through to their actual ATS platform (Greenhouse, Lever, SmartRecruiters) when the direct page is just a marketing landing shell with no real job listings.
+ 
+During development we also experimented with pulling from About pages, Press pages, company blogs, and Reddit. Some of this turned up genuinely interesting content — a funding announcement here, a retail-expansion story there — but it also introduced a lot more noise, and more importantly, it introduced signal types (growth announcements, leadership hires unrelated to operations) that our own taxonomy had already decided not to weight highly. Rather than let that noise creep into the final scoring, the submitted prototype sticks to the two sources that consistently produced clean, verifiable evidence.
+ 
+Once text is fetched, it goes through:
+1. **LLM extraction** — pulling candidate signals as verbatim quotes, never paraphrased.
+2. **A deterministic rule filter** — a plain Python layer that rejects known non-signal patterns (policy language, generic careers CTAs like "Apply Now," bare FAQ headings) regardless of what the model labeled them.
+3. **Verification** — checking that each surviving signal's evidence is a real, exact substring of the source document, not something the model invented.
+4. **Scoring** — a simple weighted sum, one weight per unique signal category actually present, no per-mention inflation.
+5. **ICP eligibility gate** — every account defaults to eligible; flagged only when specific evidence suggests otherwise (see Section 5).
+6. **Ranking and outreach generation** — for accounts that clear the bar, a LinkedIn message and a follow-up email are generated, constrained to reference only the verified evidence and nothing invented.
+## 4. What Went Wrong Along the Way (And Why It Matters)
+ 
+This is probably the most important section of the memo, because the mistakes taught us more about the actual reliability of this kind of system than the parts that worked cleanly on the first try.
+ 
+**Verification checks that a quote is real — not that it's correctly understood.** Early on, a stated $9.95 return fee on Brooklinen's site got misclassified as a "returns issue," even though it's a perfectly normal, non-remarkable policy statement, not a complaint. It passed verification fine, because the sentence really was on the page — the problem was entirely in how the model interpreted it. We fixed this with explicit negative examples in the extraction prompt and a deterministic filter that catches this pattern regardless of the model's judgment. The same class of mistake showed up again later with "Apply Now" being read as a hiring signal, and with a "Director of Formulation" role being misclassified as an executive trigger event when we experimented with a broader taxonomy — a role in product formulation has nothing to do with logistics or CX, and it shouldn't have counted.
+ 
+**Scoring stability turned out to be a real problem, not a hypothetical one.** During development, Graza consistently produced two clean, manually-verified signals — a 3PL Analyst hiring and a stated inability to accept returns on a perishable product. But across different automated runs, largely due to an evolving deduplication bug and shifting filter logic, its automated score bounced between 13, 21, and 29 for the same underlying evidence. We caught this by comparing automated runs against our own hand-verified numbers, and the discrepancy was serious enough that we made a deliberate call: **the final results submitted here were locked after manual verification, not taken from the last automated run.** A scoring system that gives different answers on different runs for the same evidence isn't something we'd want a sales leader relying on, and we'd rather say so plainly than quietly submit whichever run happened to look best.
+ 
+**Filter improvements can just as easily break something that already worked.** At one point, tightening the filter to catch more false positives on longer FAQ-style pages also deleted Graza's genuine, previously-verified perishable-return signal — a real regression, not an improvement. That was the moment we decided to stop iterating on the extraction and filtering logic entirely and lock in the last state we'd actually checked by hand. The honest takeaway here is that without a proper regression-tested gold dataset, every change to a prompt or a filter is as likely to quietly break something correct as it is to fix something wrong — and we didn't have the runway in this project to build that kind of test harness properly.
+ 
+To make this concrete rather than abstract, here is a side-by-side from one experimental run where we temporarily expanded the source set to include About, Press, and Blog pages and broadened the taxonomy to include `growth_signal` and `trigger_event` categories:
+ 
+*Correctly retained (matches our locked, submitted results):*
+```json
+{"signal": "hiring_logistics", "evidence": "3PL Analyst", "brand": "Graza", "source": "careers", "verification": "verified"}
+{"signal": "returns_issue", "evidence": "Unfortunately, we are not able to accept returns whereas Graza is a perishable food product.", "brand": "Graza", "source": "returns", "verification": "verified"}
 ```
-Curated Brand List
-        │
-        ▼
-Page Fetching (requests + BeautifulSoup)
-   Returns/Shipping page + Careers page
-        │
-        ▼
-LLM Signal Extraction (structured JSON)
-        │
-        ▼
-Deterministic Rule Filter
-   (strips policy language, reassurance language,
-    obvious non-signals before verification)
-        │
-        ▼
-Evidence Verification
-   (normalize + substring match against source text)
-        │
-        ▼
-Intent Scoring (fixed weights, summed)
-        │
-        ▼
-ICP Eligibility Gate
-        │
-        ▼
-Ranking
-        │
-        ▼
-Personalized Outreach Generation
+ 
+*Incorrectly classified (excluded from our submitted results, kept here only as evidence of the failure mode):*
+```json
+{"signal": "trigger_event", "evidence": "Director of Formulation", "brand": "Blueland", "source": "careers", "verification": "verified"}
+{"signal": "growth_signal", "evidence": "Blueland Announces Retail Expansion Into Whole Foods With Refillable Hand Soap", "brand": "Blueland", "source": "press", "verification": "verified"}
+{"signal": "growth_signal", "evidence": "Blueland Raises $20 Million for New Category and Retail Expansion to Eliminate More Single-Use Plastic", "brand": "Blueland", "source": "press", "verification": "verified"}
+{"signal": "hiring_customer_support", "evidence": "assist and educate customers while providing the highest level of customer experience.", "brand": "Jones Road Beauty", "source": "careers", "verification": "verified"}
 ```
-
-Each stage writes its output to disk independently (`data/raw/`, `data/verified/`, `data/scored/`, etc.), which made the pipeline debuggable at every step rather than a single opaque black box.
-
-**Scope decisions**, made deliberately in light of the brief's stated preference for an honest, well-reasoned prototype over an over-engineered system:
-
-- **Fetch layer:** `requests` + `BeautifulSoup` only. No headless browser (Playwright) was used. Pages that require JavaScript rendering (e.g. some ATS-hosted careers listings) are flagged `manual_required: True` with a reason, rather than silently failing or being scraped incorrectly.
-- **Verification:** kept intentionally simple — lowercase, whitespace normalization, HTML entity decoding, substring match. If a claimed piece of evidence doesn't appear in the source text after normalization, it's marked unverified and excluded from scoring. No fuzzy matching or embedding-based similarity was used.
-- **Scoring:** a flat, inspectable rule — each verified signal category contributes a fixed weight; weights are summed with no normalization or calibration. The rationale for any weight is answerable in one sentence: *"weights reflect perceived proximity to an active buying decision."*
-
----
-
-## 4. Intent Taxonomy
-
-Signals were grouped manually by their expected causal proximity to a logistics-software purchasing decision.
-
-| Signal | Weight | Rationale |
-|---|---|---|
-| Warehouse expansion | 9 | Directly implies new fulfillment infrastructure |
-| Carrier partnership | 9 | Directly implies active shipping/logistics decisions |
-| Shipping issue | 8 | Operational pain point in the core product surface |
-| Delivery issue | 8 | Same category, customer-facing failure mode |
-| Returns issue | 7 | Operational pain, one step removed from shipping |
-| Reverse logistics | 7 | Specialized, high-intent operational signal |
-| Hiring — logistics roles | 6 | Forward-looking, but hiring lags actual need |
-| Hiring — customer support | 5 | Weaker, more indirect signal of operational strain |
-
-The taxonomy deliberately weights infrastructure and operational-failure signals above generic hiring or growth signals, since the latter are more easily confounded with unrelated company growth.
-
----
-
-## 5. Methodology
-
-### 5.1 Data Collection
-
-For each brand, the pipeline attempts to retrieve two page types:
-
-- **Returns / shipping policy page** — the primary source for delivery, shipping, and returns-related operational language.
-- **Careers page** — the primary source for hiring-related signals (logistics roles, customer support roles, warehouse roles).
-
-Brands were selected based on public evidence availability: an active careers page, an accessible returns page, and (where available) public discussion (Reddit, reviews) corroborating operational activity. This selection criterion was itself a judgment call favoring evaluability over raw coverage.
-
-### 5.2 Signal Extraction
-
-Fetched page text is passed to an LLM with a structured extraction prompt that returns JSON: a list of `{signal, evidence, source}` objects per page. No signal is accepted on the model's say-so alone — every extracted signal proceeds to the filter and verification stages below.
-
-### 5.3 Deterministic Rule Filter
-
-This stage was added specifically in response to a failure mode discovered during testing (see §7): LLM extraction on long FAQ-style pages tended to surface **policy statements** ("we do not accept returns on any of our products") and **reassurance language** ("carriers often mark a package Delivered when it's still in transit — this is normal") as if they were operational complaints. The filter strips known patterns of this kind before scoring, so that standard policy boilerplate cannot masquerade as buying-intent evidence.
-
-### 5.4 Evidence Verification
-
-Every signal that survives the filter is checked against the actual scraped source text (normalized: lowercase, whitespace-collapsed, HTML entities decoded). Only evidence that is a literal substring match of the source is marked `verified`; everything else is dropped before scoring. This step exists specifically to catch model hallucination — an extracted "signal" that doesn't actually appear in the source page is not evidence of anything.
-
-### 5.5 Intent Scoring
-
-Verified signals are scored by summing the fixed weight for each **distinct signal category** present (not per occurrence). This was a deliberate fix made mid-project: an earlier version of the scorer summed weights per individual matched sentence, which meant a single policy fact restated three times in one FAQ (as happened with Momofuku Goods — see §7) could inflate a brand's score far beyond what the underlying evidence justified. Weighting by category rather than raw count removes that inflation.
-
-### 5.6 ICP Gate and Ranking
-
-Scored brands are passed through an ICP eligibility check before ranking, so that a brand with a high intent score but a poor customer fit does not surface ahead of a lower-scoring but well-fitted account. Ranked, ICP-eligible brands then proceed to outreach generation.
-
-### 5.7 Outreach Generation
-
-For each qualified, ranked account, the pipeline generates a short personalized outreach draft that references the specific verified signal(s) driving that account's score — not a generic template. This was treated as a first-class deliverable, in line with the rubric's 20% weight on personalized outbound.
-
----
-
+ 
+Each of these passed our verification step cleanly — the evidence really was present, verbatim, on the source page — which is exactly the point made above: verification confirmed *provenance*, not *correctness*. "Director of Formulation" is a product/R&D role with no connection to logistics or CX and should never have been scored as an executive trigger event. The two Blueland press signals are real announcements, but they're exactly the kind of generic growth/funding evidence our own taxonomy (Section 2) explicitly ranks lowest and treats with suspicion — including them would have meant scoring Blueland higher on the same category of evidence the brief specifically warns against over-weighting. And "assist and educate customers... highest level of customer experience" is job *responsibility* language pulled from a paragraph, not an actual job title, despite passing our hiring-signal filter at the time.
+ 
+We also saw a related, lower-severity version of the same issue on Rothy's: a "Get Started → returns portal" instruction and a Happy Returns privacy-policy disclaimer were extracted as `reverse_logistics` evidence. The first is a UI navigation step, not a stated fact about the brand's operations, and the second is boilerplate legal language, not evidence of anything. Our submitted result for Rothy's instead uses a different, more substantive piece of evidence from the same page — a note that certain items ineligible for return can instead be listed for resale on Poshmark — which is a genuine description of a return-limitation workaround rather than an instruction or a legal disclaimer.
+ 
+None of the incorrect examples above appear in our submitted results. We include them here specifically because they're useful, concrete evidence of *why* we don't trust an automated pipeline's output without manual verification, and why our final numbers were locked by hand rather than taken from the last run of an evolving system.
+ 
+## 5. ICP Eligibility
+ 
+Per the brief's own guidance — assume ICP qualification unless research clearly shows otherwise — our eligibility check defaults every account to eligible, using curated checks (D2C, physical product, presumed mid-market) rather than an automated GMV lookup, which would need paid enrichment tools we didn't have access to.
+ 
+One account was flagged rather than excluded: **Rothy's**, based on real, specific evidence — a roughly $1B valuation, a retail footprint spanning multiple countries, and general company maturity — that suggests it may sit above the $5–100M GMV band this ICP targets. We didn't exclude it, since the brief is explicit that ambiguous evidence should be flagged, not acted on unilaterally, but it's noted clearly in our results.
+ 
 ## 6. Results
-
-The submission is anchored on a **hand-verified 8-brand set**, chosen and inspected in depth over the course of the project. For each brand, the pipeline output includes:
-
-- Raw fetched source text (`data/raw/`)
-- Extracted, filtered, and verified signals per page (`data/verified/`)
-- A final intent score with a category-by-category breakdown
-- ICP gate result
-- A personalized outreach draft (where the brand qualified)
-
-*(Insert the final ranked table of the 8 brands with scores, top signals, and ICP status here once the run is finalized.)*
-
-Every score in this set is traceable back to a specific piece of verified evidence in the corresponding source document — this traceability was treated as more important than raw score magnitude.
-
----
-
-## 7. Extended Evaluation: The 25-Brand Run
-
-After validating the pipeline on the 8-brand set, it was scaled to a broader 25-brand run to stress-test it beyond hand-curated inputs. This surfaced a concrete and instructive failure mode.
-
-**What happened:** Several brands' returns pages were long FAQ-style documents rather than short policy statements. On these pages, the extractor correctly identified sentences about deliveries, returns, and shipping — but many of those sentences were standard policy language or brand reassurance copy, not evidence of operational strain. Momofuku Goods was the clearest case: 11 "signals" were extracted from its returns FAQ, of which roughly one was a defensible (if weak) signal, and the remainder were restatements of a no-returns policy or explanations of routine carrier handling. The deterministic filter, tuned against the original 8-brand sample, did not catch these patterns because it hadn't been exposed to long-FAQ policy phrasing during development.
-
-**What did *not* fail:** The scoring math itself. Once the category-level scoring fix (§5.5) was in place, the inflation from repeated evidence was eliminated. The remaining problem was upstream — the filter's pattern coverage, not the scoring logic.
-
-**Decision:** The 8-brand set is the primary submission dataset, because it is the one that has been manually inspected end-to-end and is known to be reliable. The 25-brand run is reported here as an extended evaluation, not as the primary benchmark, because it revealed a genuine, unresolved gap in filter coverage that would need further iteration to trust at scale.
-
-This is treated as a finding worth reporting rather than a result to hide: it demonstrates the pipeline's failure mode is legible, diagnosable, and traceable to a specific stage (deterministic filtering on long-form FAQ pages) rather than a systemic flaw in the scoring or verification design.
-
----
-
-## 8. Limitations
-
-- **Filter coverage is incomplete.** The deterministic filter was tuned against the 8-brand sample and does not generalize cleanly to longer, noisier FAQ documents, as demonstrated by the 25-brand run.
-- **No JavaScript-rendered page support.** Careers pages hosted on JS-heavy ATS platforms (e.g. certain Greenhouse/Lever embeds) are not reachable by the current fetch layer and are flagged `manual_required` rather than scraped.
-- **Verification is a strict substring match**, not semantic matching. This minimizes hallucinated evidence but means legitimate paraphrased evidence can be under-counted.
-- **Weights are hand-assigned, not empirically calibrated.** They reflect a defensible business judgment about proximity to a buying decision, not a statistically fitted model.
-- **Coverage is intentionally narrow.** The submission favors depth and traceability on a small set of brands over broad coverage with unverified quality, in line with the brief's explicit preference.
-
----
-
-## 9. Future Work
-
-- Extend the deterministic filter with targeted heuristics for FAQ-style pages: distinguishing policy statements and reassurance language from genuine complaints, rather than attempting to enumerate every possible phrasing.
-- Add ATS-aware fetching (Greenhouse/Lever API endpoints) to recover real job listings currently missed on JS-rendered careers pages.
-- Re-run the 25-brand set with the improved filter and re-evaluate the previously flagged brands (Momofuku Goods, and any others surfaced by the same pattern).
-- Explore lightweight semantic verification (e.g. paraphrase detection) as a complement to, not a replacement for, strict substring verification.
-- Calibrate signal weights against real historical account outcomes if/when such data becomes available.
-
----
-
-## 10. Conclusion
-
-This prototype reliably converts publicly available evidence into traceable buying-intent signals and personalized outbound, while explicitly documenting where and why its extraction pipeline still produces false positives. The 8-brand submission set demonstrates the full pipeline working end-to-end with verified, defensible scores. The 25-brand extended evaluation demonstrates the same pipeline under more realistic, noisier conditions — and honestly reports the specific limitation that surfaced, rather than concealing it. Given the brief's explicit preference for a thoughtful, well-reasoned prototype with honest limitations over an over-engineered system that overclaims production readiness, this is the tradeoff the project deliberately makes.
+ 
+We evaluated 8 of the 25 provided brands, chosen for reliable public-data availability — URLs for all 25 were researched during scoping, but depth on a smaller, carefully verified set was prioritized over shallow coverage of all 25, in line with the brief's own stated preference for a well-reasoned prototype over one that overclaims completeness.
+ 
+| Rank | Brand | Intent Score | Verified Signal(s) |
+|---|---|---|---|
+| 1 | Graza | 13 | 3PL Analyst hiring; stated inability to accept returns (perishable product) |
+| 2 | Caraway | 13 | Barcode-liability complaint (returns friction); Technical Project Leader hiring |
+| 3 | Rothy's | 7 | Poshmark resale workaround for return-ineligible items — flagged for ICP review |
+| 4 | Blueland | 6 | Process Engineer hiring |
+| 5 | Brooklinen | 0 | No qualifying signal found |
+| 6 | Vuori | 0 | No qualifying signal found |
+| 7 | Kosas | 0 | No qualifying signal found |
+| 8 | Solo Stove | 0 | Blocked — HTTP 403 on returns page, SSL certificate mismatch on careers subdomain |
+ 
+Outreach (one LinkedIn message and one follow-up email, each referencing the specific verified evidence) was generated for the top 4 accounts. **We generated 4 sequences rather than 5**, because only 4 of the 8 evaluated accounts produced genuinely verified evidence. We considered padding the list to 5 using weaker or unverified signals from a broader exploratory run, but decided against it — doing so would mean writing personalized-sounding outreach with no real evidence behind it, which is precisely the failure mode this project exists to prevent. We think 4 grounded, defensible sequences serve the actual goal better than 5 where one would be fabricated.
+ 
+## 7. Limitations & Tradeoffs
+ 
+- **Two source types, not the suggested 2–3.** Reddit was attempted through manually curated URLs, but consistently returned HTTP 403 for anonymous requests. One fix attempt (adding a real browser User-Agent header) didn't resolve it, and we didn't pursue it further given the project's time box.
+- **No automated GMV verification** — the ICP gate relies on curated assumptions rather than a live revenue lookup (see Section 5).
+- **Extraction and filtering are not perfectly reliable**, and we found this out the hard way (see Section 4). We'd rather report this honestly than paper over it with a filter we didn't have time to properly validate.
+- **Scoring reproducibility is a known open issue.** Repeated automated runs did not always reproduce our hand-verified numbers for the same evidence — this is documented in Section 4, and it's the reason our submitted results were manually locked rather than taken from an automated batch run.
+- **Weights are hand-assigned**, reflecting a defensible business judgment about which signals matter most, not coefficients learned from real conversion data, which we didn't have access to.
+## 8. Compliance Note
+ 
+Everything collected here is publicly available — company returns pages, careers pages. No login-gated content, no private data, no personal information beyond what a brand itself has published. Reddit access was attempted only through standard, unauthenticated requests, and dropped once it became clear that wasn't working reliably rather than pursuing a workaround.
+ 
+## 9. What We'd Build Next
+ 
+Given more time, the next steps would be: a small hand-labeled gold dataset with automated regression tests, so future prompt or filter changes can be checked against known-correct answers instead of judged by eye each time; a real GMV/scale-estimation step to replace the curated ICP assumptions; broader, more reliable source coverage (particularly an authenticated path to Reddit); and continuous monitoring of accounts over time rather than a one-time snapshot, so new intent signals can be surfaced as they appear rather than requiring a fresh full run.
+ 
+## 11. Appendix: Extended Exploratory Run (Not Part of Submitted Results)
+ 
+For transparency, this appendix shows the output of one exploratory run that expanded source coverage to About, Press, and Blog pages and broadened the taxonomy to include `growth_signal` and `trigger_event` categories. **None of this data is part of our submitted results in Section 6** — it's included here only so the reasoning behind our decision to lock the smaller, hand-verified set is fully visible, not just asserted.
+ 
+| Brand | Score | Status | Note |
+|---|---|---|---|
+| Graza | 13 | ✅ Reliable | Matches our locked, submitted result exactly (3PL Analyst + perishable-return refusal). |
+| Blueland | 11 | ❌ Not reliable | Includes "Director of Formulation" misclassified as a trigger event, and two funding/retail-expansion signals that our own taxonomy explicitly treats as weak, generic evidence (see Section 4). Submitted result uses only the verified Process Engineer hiring signal, score 6. |
+| Rothy's | 7 | ⚠️ Partially reliable | Score matches our submitted result, but the underlying evidence differs: this run cites a UI navigation instruction and a legal privacy-policy disclaimer, neither of which is a genuine signal. Our submitted result instead uses a different, more substantive piece of evidence from the same page (a Poshmark resale workaround for return-ineligible items). |
+| Caraway | 5 | ❌ Not reliable | Cites only "QA Manager, Customer Experience," a single unverified title. Our submitted result (score 13) is built on two signals we manually verified directly against source text: a barcode-liability complaint and a Technical Project Leader hiring. |
+| Vuori | 5 | ⚠️ Plausible but unverified | "Customer Service Agent" is a real, generic hiring signal consistent with earlier findings in this project, but it was not re-verified in this specific run. Not included in submitted results because our locked evaluation found no qualifying signal for Vuori. |
+| Jones Road Beauty | 5 | ❌ Not reliable | Cites "assist and educate customers... highest level of customer experience" as a hiring signal — this is job-responsibility marketing language, not an actual job title, and should not have passed our filter. Not part of our evaluated brand set. |
+| Brooklinen, Solo Stove, Kosas, Liquid Death, Our Place, Magic Spoon | 0 | ✅ Consistent | All scored 0 in this run, consistent with our submitted results for Brooklinen, Solo Stove, and Kosas (the other three are outside our primary 8-brand set). |
+ 
+The pattern here is consistent with the rest of Section 4: broadening sources and taxonomy categories introduced new, plausible-looking signals that did not hold up under manual scrutiny, while our original, narrower, hand-verified set remained stable throughout. This is why the results in Section 6 — not this appendix — represent what we are actually standing behind in this submission.
+ 
+## 12. Closing
+ 
+This project is, honestly, as much a story about what didn't work cleanly the first time as it is about what did. We hit real bugs — a scoring regression, a filter that deleted a signal we'd already verified, a model that misread a routine return-fee policy as a complaint — and each one taught us something concrete about where an LLM-based pipeline like this needs guardrails before it can be trusted. We'd rather hand over a smaller, honestly-verified set of results with those lessons written down clearly than a bigger, shinier-looking table we hadn't actually checked.
+ 
