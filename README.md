@@ -1,22 +1,23 @@
 # ClickPost Intent-Based Account Prioritization Engine
 
-An end-to-end AI-powered pipeline that identifies and ranks Direct-to-Consumer (DTC) brands based on publicly observable logistics intent signals.
+An end-to-end AI-powered pipeline that identifies, verifies, ranks, and activates Direct-to-Consumer (D2C) accounts based on publicly observable buying-intent signals.
 
-Instead of ranking accounts by company size or generic firmographic data, this project discovers operational buying intent from publicly available sources such as returns policies and careers pages, verifies extracted evidence against the original webpages, scores intent using a deterministic taxonomy, applies an Ideal Customer Profile (ICP) gate, and generates personalized outbound outreach.
+Instead of relying on firmographic data or company size alone, this project discovers operational buying intent from publicly available sources such as returns policies and careers pages, verifies every extracted signal against the original webpage, scores intent using an explainable rule-based taxonomy, applies an Ideal Customer Profile (ICP) gate, and generates personalized outbound outreach grounded only in verified evidence.
 
 ---
 
 # Features
 
 - Automated webpage fetching
-- ATS (Greenhouse / Lever / BuiltIn) career page discovery
-- GPT-based logistics signal extraction
+- ATS (Greenhouse / Lever / SmartRecruiters / BuiltIn) career page discovery
+- GPT-powered logistics signal extraction
 - Deterministic false-positive filtering
-- Exact evidence verification against source documents
-- Intent scoring using weighted operational taxonomy
-- ICP eligibility gate
+- Exact evidence verification against source webpages
+- Explainable rule-based intent scoring
+- ICP eligibility evaluation
 - Account ranking
-- Personalized outreach generation
+- Grounded outbound generation (Email + LinkedIn)
+- CSV and JSON output generation
 - Intermediate artifacts saved for complete auditability
 
 ---
@@ -24,7 +25,7 @@ Instead of ranking accounts by company size or generic firmographic data, this p
 # System Architecture
 
 ```
-                    Curated URLs
+                 Curated Brand URLs
                          │
                          ▼
                 Page Fetching
@@ -49,7 +50,7 @@ Instead of ranking accounts by company size or generic firmographic data, this p
                 Account Ranking
                          │
                          ▼
-          Personalized Outreach
+      Grounded Outreach Generation
 ```
 
 ---
@@ -59,7 +60,6 @@ Instead of ranking accounts by company size or generic firmographic data, this p
 ```
 clickpost-intent-engine/
 
-│
 ├── fetch/
 │   ├── fetch_pages.py
 │   ├── fetch_reddit.py
@@ -108,29 +108,25 @@ clickpost-intent-engine/
 
 ## 1. Fetch
 
-For every target brand the system attempts to retrieve:
+For every target brand, the pipeline retrieves:
 
 - Returns / Shipping Policy
 - Careers Page
 
-If curated URLs are unavailable, common URL patterns are attempted automatically.
-
-ATS-hosted career pages are automatically followed where supported.
+When careers pages redirect to ATS platforms (Lever, Greenhouse, SmartRecruiters, BuiltIn), the crawler automatically follows them.
 
 ---
 
 ## 2. Signal Extraction
 
-GPT extracts structured operational signals including:
+GPT extracts candidate operational signals directly from webpage text.
 
-- Shipping issues
-- Delivery issues
-- Returns issues
-- Reverse logistics
-- Logistics hiring
-- Customer support hiring
-- Warehouse expansion
-- Carrier partnerships
+The final scoring pipeline focuses on four signal categories:
+
+- Hiring Logistics
+- Hiring Customer Support
+- Returns Issues
+- Reverse Logistics
 
 Each extracted signal contains:
 
@@ -143,48 +139,45 @@ Each extracted signal contains:
 
 ## 3. Rule-Based Filtering
 
-A deterministic filtering layer removes common false positives such as:
+A deterministic Python filter removes common false positives such as:
 
 - Generic careers headings
+- "Apply Now"
 - "Open Roles"
-- Positive marketing language
-- Routine return policy text
-- Generic refund instructions
-- Boilerplate FAQ content
+- FAQ headings
+- Routine return-policy language
+- Boilerplate legal text
+- Generic customer-support instructions
 
-This reduces hallucinated logistics signals before verification.
+This significantly reduces false positives before verification.
 
 ---
 
 ## 4. Evidence Verification
 
-Every extracted evidence sentence is verified using exact substring matching against the original fetched document.
+Every extracted quote is verified using exact substring matching against the original webpage.
 
-Signals are marked as:
+Signals are labeled as:
 
 - verified
 - manual_review
 
-Only verified evidence contributes to intent scoring.
+Only verified signals contribute to intent scoring.
 
 ---
 
 ## 5. Intent Scoring
 
-Each operational signal category contributes a predefined weight.
+Intent scores are generated using an explainable weighted taxonomy.
 
 | Signal | Weight |
 |---------|--------|
-| Warehouse Expansion | 9 |
-| Carrier Partnership | 9 |
-| Shipping Issue | 8 |
-| Delivery Issue | 8 |
 | Returns Issue | 7 |
 | Reverse Logistics | 7 |
 | Hiring Logistics | 6 |
 | Hiring Customer Support | 5 |
 
-Scores are calculated **once per unique signal category**, preventing repeated FAQ statements from artificially inflating rankings while preserving all supporting evidence.
+Scores are calculated once per unique signal category, preventing repeated FAQ statements from artificially inflating rankings while preserving all supporting evidence.
 
 ---
 
@@ -194,9 +187,9 @@ Each company is evaluated against three manually curated criteria:
 
 - Direct-to-Consumer
 - Mid-market
-- Physical products
+- Physical Products
 
-Brands remain in the ranking even if they require manual review.
+Brands remain in the ranked output even if flagged for manual review.
 
 Example:
 
@@ -206,7 +199,7 @@ Eligible: True
 Flagged for Review: True
 
 Reason:
-Public research indicates unicorn-scale valuation and business scale that may exceed the target ICP.
+Public research suggests the company may exceed the target mid-market ICP.
 ```
 
 ---
@@ -219,15 +212,23 @@ Accounts are ranked using:
 - deterministic weights
 - ICP eligibility
 
-Incomplete fetches are explicitly labeled rather than treated as successfully evaluated.
+Brands with incomplete fetches are explicitly labeled instead of being treated as successfully evaluated.
 
 ---
 
-## 8. Outreach Generation
+## 8. Grounded Outreach Generation
 
 Personalized outreach is generated only for accounts containing verified operational signals.
 
-Brands with no verified signals do not receive generated outreach.
+The generator:
+
+- references only verified evidence
+- avoids unsupported business assumptions
+- produces:
+  - personalized cold email
+  - LinkedIn connection request
+
+All generated outreach is grounded in the captured evidence.
 
 ---
 
@@ -235,26 +236,34 @@ Brands with no verified signals do not receive generated outreach.
 
 The pipeline was validated through:
 
-- repeated deterministic runs on identical inputs
-- manual comparison of verified evidence against raw fetched webpages
+- repeated pipeline executions
+- manual verification against source webpages
 - inspection of intermediate artifacts
+- deterministic filtering
 - iterative reduction of false positives discovered during development
+
+Several scoring and filtering regressions were identified during development and used to improve the final pipeline.
 
 ---
 
-# Example Output
+# Example Final Ranking
 
-```
-Rank    Brand                 Score
+| Rank | Brand | Score |
+|------|--------|------:|
+| 1 | Graza | 13 |
+| 2 | Blueland | 11 |
+| 3 | Rothy's | 7 |
+| 4 | Vuori | 5 |
+| 5 | Caraway | 5 |
+| 6 | Jones Road Beauty | 5 |
+| 7 | Brooklinen | 0 |
+| 8 | Solo Stove | 0 |
+| 9 | Kosas | 0 |
+|10 | Liquid Death | 0 |
+|11 | Our Place | 0 |
+|12 | Magic Spoon | 0 |
 
-1       Native Deodorant        21
-2       Tushy                   20
-3       Beardbrand              15
-4       Momofuku Goods          15
-5       Graza                   13
-6       Caraway                 13
-7       Olipop                  13
-```
+Outreach was automatically generated for brands with verified buying-intent signals.
 
 ---
 
@@ -280,7 +289,7 @@ Set your OpenAI API key:
 export OPENAI_API_KEY=YOUR_API_KEY
 ```
 
-or in Google Colab:
+Or in Google Colab:
 
 ```python
 from google.colab import userdata
@@ -297,7 +306,7 @@ os.environ["OPENAI_API_KEY"] = userdata.get("OPENAI_API_KEY")
 python run_pipeline.py
 ```
 
-Outputs are written to:
+Generated outputs include:
 
 ```
 data/raw/
@@ -311,6 +320,10 @@ data/scored/
 data/outreach/
 
 data/final/
+
+ranked_accounts.csv
+
+ranked_accounts.json
 ```
 
 ---
@@ -323,29 +336,29 @@ data/final/
 - Requests
 - Pandas
 - lxml
-- dotenv
+- python-dotenv
 
 ---
 
 # Limitations
 
-- Public webpages only
-- Some websites block automated fetching (403, SSL)
-- FAQ-style pages may still produce false-positive operational signals despite deterministic filtering
+- Uses only publicly available webpages
+- Some websites block automated scraping (HTTP 403, SSL issues)
+- Signal weights are heuristic rather than learned from historical CRM outcomes
 - ICP labels are manually curated
-- Website content changes over time and may affect extracted evidence
+- Website content may change over time
+- LLM extraction still requires deterministic verification to reduce false positives
 
 ---
 
 # Future Improvements
 
-- Retrieval-Augmented Generation (RAG)
-- Semantic evidence deduplication
-- Automatic ICP inference
-- News and earnings integration
-- Confidence calibration
-- Human feedback loop
-- Interactive web application
+- Retrieval-Augmented Generation (RAG) over company documentation
+- Automated regression testing using a gold-standard evaluation set
+- CRM feedback loop for learning signal weights
+- Automated ICP inference
+- Continuous monitoring of buying-intent signals
+- Interactive dashboard for SDR workflows
 
 ---
 
@@ -356,10 +369,6 @@ data/final/
 AI/ML Engineer | Applied LLMs | Information Retrieval | Intelligent Automation
 
 GitHub:
+
 https://github.com/gotnochill815-web
 
----
-
-# License
-
-This project was developed as part of a technical assessment for ClickPost and is intended for educational and portfolio purposes.
