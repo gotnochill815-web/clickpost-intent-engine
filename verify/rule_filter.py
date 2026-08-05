@@ -1,8 +1,8 @@
 import re
 
-# --------------------------------------------
-# Patterns used in filters
-# --------------------------------------------
+# ---------------------------------------------------------
+# Obvious positive / informational policy language
+# ---------------------------------------------------------
 
 POSITIVE_PATTERNS = [
     r"\beasy\b",
@@ -19,15 +19,11 @@ POSITIVE_PATTERNS = [
     r"\brefund\b",
     r"\bexchange\b",
     r"\breturn policy\b",
-
-    # Additional policy language patterns
-    r"\bfinal sale\b",
-    r"\bmail-in refund\b",
-    r"\bfee will be charged\b",
-    r"\bmay be returned\b",
-    r"\bmay not be returned\b",
-    r"\bmay not be exchanged\b",
 ]
+
+# ---------------------------------------------------------
+# Generic headings
+# ---------------------------------------------------------
 
 HEADING_PATTERNS = [
     r"^returns\s*&\s*exchanges$",
@@ -37,99 +33,56 @@ HEADING_PATTERNS = [
     r"^delivery$",
     r"^exchanges$",
     r"^replacements$",
-    r"^merch returns\s*&\s*exchanges$",
 ]
 
-# Question patterns for reverse_logistics
-QUESTION_PATTERNS = [
-    r"^how do",
-    r"^how long",
-    r"^what should",
-    r"^can i",
-    r"\?$",
-]
+# ---------------------------------------------------------
+# Generic hiring pages (not real job evidence)
+# ---------------------------------------------------------
 
-# Support/help-center patterns for filtering customer service instructions
-SUPPORT_PATTERNS = [
-    r"\blet us know\b",
-    r"\breach out\b",
-    r"\bcontact us\b",
-    r"\bstill need help\b",
-    r"\bsupport widget\b",
-    r"\border status\b",
-    r"\blost or damaged your order\b",
-    r"reach out",
-    r"still need help",
-    r"support widget",
-    r"order status",
-    r"contact us",
-    r"customer support team",
-    r"hi@",
-]
+INVALID_HIRING_PHRASES = {
+    "apply now",
+    "careers",
+    "career",
+    "work with us",
+    "join our team",
+    "join the team",
+    "open positions",
+    "view openings",
+    "see openings",
+    "open roles",
+}
 
-# Legal/Privacy patterns for reverse_logistics
-LEGAL_PATTERNS = [
-    r"privacy policy",
-    r"terms of service",
-    r"agree",
-    r"happy returns",
-    r"terms",
-    r"agreement",
-]
-
-# --------------------------------------------
-# Job title patterns for hiring detection
-# --------------------------------------------
+# ---------------------------------------------------------
+# Job title keywords
+# ---------------------------------------------------------
 
 JOB_TITLE_PATTERNS = [
-    r"manager",
-    r"director",
-    r"lead",
-    r"analyst",
-    r"coordinator",
-    r"specialist",
-    r"associate",
-    r"customer service",
-    r"customer support",
-    r"customer experience",
-    r"customer success",
-    r"logistics",
-    r"warehouse",
-    r"fulfillment",
-    r"supply chain",
-    r"3pl",
-    r"distribution",
-    r"inventory",
-    r"procurement",
-    r"transportation",
-    r"returns",
-    r"operations",
+    r"\bmanager\b",
+    r"\bdirector\b",
+    r"\blead\b",
+    r"\banalyst\b",
+    r"\bcoordinator\b",
+    r"\bspecialist\b",
+    r"\bassociate\b",
+    r"\bcustomer service\b",
+    r"\bcustomer support\b",
+    r"\bcustomer experience\b",
+    r"\bcustomer success\b",
+    r"\blogistics\b",
+    r"\bwarehouse\b",
+    r"\bfulfillment\b",
+    r"\bsupply chain\b",
+    r"\b3pl\b",
+    r"\bdistribution\b",
+    r"\binventory\b",
+    r"\bprocurement\b",
+    r"\btransportation\b",
+    r"\boperations\b",
 ]
 
-# For backward compatibility and additional checking
-JOB_TITLE_WORDS = [
-    "manager",
-    "lead",
-    "director",
-    "coordinator",
-    "associate",
-    "analyst",
-    "operations",
-    "logistics",
-    "warehouse",
-    "fulfillment",
-    "distribution",
-    "inventory",
-    "procurement",
-    "transportation",
-    "3pl",
-    "supply chain",
-    "customer",
-    "support",
-    "experience",
-    "success",
-    "returns",
-]
+# ---------------------------------------------------------
+# Carrier partners
+# ---------------------------------------------------------
 
 LOGISTICS_PARTNERS = [
     "dhl",
@@ -146,6 +99,10 @@ LOGISTICS_PARTNERS = [
     "onward",
 ]
 
+# ---------------------------------------------------------
+# Executive trigger events
+# ---------------------------------------------------------
+
 EXECUTIVE_KEYWORDS = [
     "ceo",
     "coo",
@@ -159,6 +116,10 @@ EXECUTIVE_KEYWORDS = [
     "director supply chain",
 ]
 
+# ---------------------------------------------------------
+# Competitor stack
+# ---------------------------------------------------------
+
 COMPETITOR_KEYWORDS = [
     "loop",
     "aftership",
@@ -166,11 +127,14 @@ COMPETITOR_KEYWORDS = [
     "redo",
     "onward",
     "returnly",
-    "happy returns",
     "shipstation",
     "shipbob",
     "easypost",
 ]
+
+# ---------------------------------------------------------
+# Growth
+# ---------------------------------------------------------
 
 GROWTH_KEYWORDS = [
     "series",
@@ -186,73 +150,9 @@ GROWTH_KEYWORDS = [
     "fulfillment center",
 ]
 
-# --------------------------------------------
-# Deterministic filters for returns_issue
-# --------------------------------------------
-
-RETURN_POLICY_PATTERNS = [
-    r"unreadable barcode",
-    r"responsibility.*customer",
-    r"return policy",
-    r"refund policy",
-    r"return fee",
-    r"within \d+ days",
-    r"satisfaction guarantee",
-    r"perishable",
-    r"do not accept returns",
-    r"cannot accept returns",
-    r"please allow.*business days",
-    r"customer responsibility",
-]
-
-# --------------------------------------------
-# Deterministic filters for reverse_logistics
-# --------------------------------------------
-
-REVERSE_LOGISTICS_REJECT_PATTERNS = [
-    r"returns\s*&\s*exchanges",
-    r"merch returns",
-    r"privacy policy",
-    r"happy returns",
-    r"terms",
-    r"agreement",
-    r"how do",
-    r"how long",
-    r"what should",
-    r"return portal",
-    r"get started",
-    r"order number",
-    r"zip code",
-    r"click",
-    r"enter your order",
-    r"review the information",
-    r"list this item",
-    r"poshmark",
-    r"all set",
-]
-
-# --------------------------------------------
-# Hiring detection words
-# --------------------------------------------
-
-HIRING_WORDS = [
-    "hiring",
-    "join our team",
-    "job",
-    "position",
-    "opening",
-    "career",
-    "apply",
-    "customer service",
-    "customer support",
-    "customer experience",
-    "customer success",
-    "returns specialist",
-]
-
-# --------------------------------------------
-# Filter functions
-# --------------------------------------------
+# ---------------------------------------------------------
+# Main filter
+# ---------------------------------------------------------
 
 def keep_signal(signal):
 
@@ -262,109 +162,45 @@ def keep_signal(signal):
     if not evidence:
         return False
 
-    # ----------------------------
-    # Generic headings
-    # ----------------------------
+    # --------------------------------------
+    # Remove generic headings
+    # --------------------------------------
 
     for pattern in HEADING_PATTERNS:
         if re.fullmatch(pattern, evidence):
             return False
 
-    # ----------------------------
-    # Support/help-center patterns for shipping/delivery/returns
-    # ----------------------------
+    # --------------------------------------
+    # Returns / Reverse logistics
+    # --------------------------------------
 
-    if signal_type in {
-        "shipping_issue",
-        "delivery_issue",
-        "returns_issue",
-    }:
-        for pattern in SUPPORT_PATTERNS:
-            if re.search(pattern, evidence, re.IGNORECASE):
-                return False
+    if signal_type in {"returns_issue", "reverse_logistics"}:
 
-    # ----------------------------
-    # Returns / reverse logistics
-    # ----------------------------
-
-    if signal_type in {
-        "returns_issue",
-        "reverse_logistics",
-    }:
-
-        # Deterministic filter - reject policy language
-        for pattern in RETURN_POLICY_PATTERNS:
-            if re.search(pattern, evidence, re.IGNORECASE):
-                return False
-
-        # Original filters
         for pattern in POSITIVE_PATTERNS:
-            if re.search(pattern, evidence):
-                return False
-
-        if evidence.startswith("if your"):
-            return False
-
-        if evidence.startswith("if you"):
-            return False
-
-        if "please allow" in evidence:
-            return False
-
-        if "do not accept returns" in evidence:
-            return False
-
-        if "cannot accept returns" in evidence:
-            return False
-
-        if "perishable" in evidence:
-            return False
-
-    # ----------------------------
-    # Reverse logistics specific filters - Consolidated
-    # ----------------------------
-
-    if signal_type == "reverse_logistics":
-
-        # Consolidated reject patterns
-        for pattern in REVERSE_LOGISTICS_REJECT_PATTERNS:
             if re.search(pattern, evidence, re.IGNORECASE):
                 return False
 
-    # ----------------------------
-    # Hiring - Using patterns for cleaner matching
-    # ----------------------------
+    # --------------------------------------
+    # Hiring
+    # --------------------------------------
 
     if signal_type in {
         "hiring_logistics",
         "hiring_customer_support",
     }:
 
-        # Use patterns for more precise matching
+        if evidence in INVALID_HIRING_PHRASES:
+            return False
+
         if not any(
             re.search(pattern, evidence, re.IGNORECASE)
             for pattern in JOB_TITLE_PATTERNS
         ):
             return False
 
-    # ----------------------------
-    # Hiring customer support specific filters
-    # ----------------------------
-
-    if signal_type == "hiring_customer_support":
-
-        # Must contain hiring-related words
-        if not any(word in evidence for word in HIRING_WORDS):
-            return False
-
-        # Reject customer support instructions
-        for pattern in SUPPORT_PATTERNS:
-            if re.search(pattern, evidence, re.IGNORECASE):
-                return False
-
-    # ----------------------------
+    # --------------------------------------
     # Carrier partnership
-    # ----------------------------
+    # --------------------------------------
 
     if signal_type == "carrier_partnership":
 
@@ -374,9 +210,9 @@ def keep_signal(signal):
         ):
             return False
 
-    # ----------------------------
-    # Trigger event
-    # ----------------------------
+    # --------------------------------------
+    # Trigger events
+    # --------------------------------------
 
     if signal_type == "trigger_event":
 
@@ -386,9 +222,9 @@ def keep_signal(signal):
         ):
             return False
 
-    # ----------------------------
+    # --------------------------------------
     # Competitor stack
-    # ----------------------------
+    # --------------------------------------
 
     if signal_type == "competitor_stack":
 
@@ -398,9 +234,9 @@ def keep_signal(signal):
         ):
             return False
 
-    # ----------------------------
+    # --------------------------------------
     # Growth
-    # ----------------------------
+    # --------------------------------------
 
     if signal_type == "growth_signal":
 
@@ -412,6 +248,10 @@ def keep_signal(signal):
 
     return True
 
+
+# ---------------------------------------------------------
+# Remove duplicates
+# ---------------------------------------------------------
 
 def filter_signals(signals):
 
