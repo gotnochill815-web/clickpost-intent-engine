@@ -1,18 +1,28 @@
 # ClickPost Intent-Based Account Prioritization Engine
 
-An end-to-end AI-powered pipeline that identifies, verifies, ranks, and activates Direct-to-Consumer (D2C) accounts based on publicly observable buying-intent signals.
+An end-to-end AI-powered pipeline that identifies, verifies, ranks, and activates Direct-to-Consumer (D2C) brands based on publicly observable buying-intent signals.
 
-Instead of relying on firmographic data or company size alone, this project discovers operational buying intent from publicly available sources such as returns policies and careers pages, verifies every extracted signal against the original webpage, scores intent using an explainable rule-based taxonomy, applies an Ideal Customer Profile (ICP) gate, and generates personalized outbound outreach grounded only in verified evidence.
+Instead of relying on firmographic attributes or company size alone, this project discovers operational buying intent from publicly available sources such as returns policies and careers pages, verifies every extracted signal against its original webpage, scores accounts using an explainable rule-based taxonomy, applies an Ideal Customer Profile (ICP) gate, and generates personalized outbound outreach grounded only in verified evidence.
+
+---
+
+# Overview
+
+The pipeline answers a practical sales question:
+
+> **Which D2C brands are most likely to benefit from ClickPost today, and why?**
+
+Rather than treating every company equally, the system searches for operational evidence that may indicate logistics or post-purchase challenges and converts those observations into explainable buying-intent scores.
 
 ---
 
 # Features
 
 - Automated webpage fetching
-- ATS (Greenhouse / Lever / SmartRecruiters / BuiltIn) career page discovery
-- GPT-powered logistics signal extraction
+- ATS (Greenhouse, Lever, SmartRecruiters, BuiltIn) career page discovery
+- GPT-powered operational signal extraction
 - Deterministic false-positive filtering
-- Exact evidence verification against source webpages
+- Exact evidence verification against original webpages
 - Explainable rule-based intent scoring
 - ICP eligibility evaluation
 - Account ranking
@@ -113,13 +123,13 @@ For every target brand, the pipeline retrieves:
 - Returns / Shipping Policy
 - Careers Page
 
-When careers pages redirect to ATS platforms (Lever, Greenhouse, SmartRecruiters, BuiltIn), the crawler automatically follows them.
+If careers pages redirect to ATS platforms (Greenhouse, Lever, SmartRecruiters, BuiltIn), the crawler automatically follows the redirect.
 
 ---
 
 ## 2. Signal Extraction
 
-GPT extracts candidate operational signals directly from webpage text.
+GPT extracts candidate operational signals directly from webpage content.
 
 The final scoring pipeline focuses on four signal categories:
 
@@ -139,7 +149,9 @@ Each extracted signal contains:
 
 ## 3. Rule-Based Filtering
 
-A deterministic Python filter removes common false positives such as:
+A deterministic filtering layer removes common false positives before verification.
+
+Examples include:
 
 - Generic careers headings
 - "Apply Now"
@@ -149,18 +161,18 @@ A deterministic Python filter removes common false positives such as:
 - Boilerplate legal text
 - Generic customer-support instructions
 
-This significantly reduces false positives before verification.
+This reduces hallucinated or low-quality operational signals.
 
 ---
 
 ## 4. Evidence Verification
 
-Every extracted quote is verified using exact substring matching against the original webpage.
+Every extracted evidence quote is verified using exact substring matching against the original fetched webpage.
 
 Signals are labeled as:
 
-- verified
-- manual_review
+- **verified**
+- **manual_review**
 
 Only verified signals contribute to intent scoring.
 
@@ -168,7 +180,7 @@ Only verified signals contribute to intent scoring.
 
 ## 5. Intent Scoring
 
-Intent scores are generated using an explainable weighted taxonomy.
+Intent is scored using an explainable weighted taxonomy.
 
 | Signal | Weight |
 |---------|--------|
@@ -177,19 +189,19 @@ Intent scores are generated using an explainable weighted taxonomy.
 | Hiring Logistics | 6 |
 | Hiring Customer Support | 5 |
 
-Scores are calculated once per unique signal category, preventing repeated FAQ statements from artificially inflating rankings while preserving all supporting evidence.
+Each signal category contributes only once per account, preventing repeated FAQ statements from artificially inflating scores while preserving all supporting evidence.
 
 ---
 
 ## 6. ICP Gate
 
-Each company is evaluated against three manually curated criteria:
+Each company is evaluated using three manually curated criteria:
 
 - Direct-to-Consumer
 - Mid-market
-- Physical Products
+- Physical products
 
-Brands remain in the ranked output even if flagged for manual review.
+Companies remain in the ranked output even when flagged for manual review.
 
 Example:
 
@@ -199,7 +211,7 @@ Eligible: True
 Flagged for Review: True
 
 Reason:
-Public research suggests the company may exceed the target mid-market ICP.
+Public information suggests the company may exceed the intended ICP size.
 ```
 
 ---
@@ -209,10 +221,10 @@ Public research suggests the company may exceed the target mid-market ICP.
 Accounts are ranked using:
 
 - verified operational signals
-- deterministic weights
+- deterministic scoring
 - ICP eligibility
 
-Brands with incomplete fetches are explicitly labeled instead of being treated as successfully evaluated.
+Brands with incomplete webpage retrieval are explicitly identified rather than silently treated as successful evaluations.
 
 ---
 
@@ -228,25 +240,27 @@ The generator:
   - personalized cold email
   - LinkedIn connection request
 
-All generated outreach is grounded in the captured evidence.
+This ensures every outreach message remains grounded in publicly verifiable information.
 
 ---
 
 # Validation
 
-The pipeline was validated through:
+The pipeline was iteratively validated through:
 
 - repeated pipeline executions
 - manual verification against source webpages
 - inspection of intermediate artifacts
 - deterministic filtering
-- iterative reduction of false positives discovered during development
+- comparison of extracted evidence with original webpages
 
-Several scoring and filtering regressions were identified during development and used to improve the final pipeline.
+During development, several scoring and filtering regressions were identified and used to improve the final pipeline.
 
 ---
 
-# Example Final Ranking
+# Example Results
+
+The final evaluation produced the following ranked accounts:
 
 | Rank | Brand | Score |
 |------|--------|------:|
@@ -263,7 +277,7 @@ Several scoring and filtering regressions were identified during development and
 |11 | Our Place | 0 |
 |12 | Magic Spoon | 0 |
 
-Outreach was automatically generated for brands with verified buying-intent signals.
+Grounded outbound sequences were automatically generated for accounts with verified buying-intent signals.
 
 ---
 
@@ -289,7 +303,7 @@ Set your OpenAI API key:
 export OPENAI_API_KEY=YOUR_API_KEY
 ```
 
-Or in Google Colab:
+or in Google Colab:
 
 ```python
 from google.colab import userdata
@@ -301,6 +315,8 @@ os.environ["OPENAI_API_KEY"] = userdata.get("OPENAI_API_KEY")
 ---
 
 # Running
+
+Execute:
 
 ```bash
 python run_pipeline.py
@@ -340,13 +356,23 @@ ranked_accounts.json
 
 ---
 
+# Design Decisions
+
+Several alternative approaches were explored during development, including extracting signals from About pages, Press releases, Blogs, and Reddit.
+
+While these sources occasionally surfaced interesting company updates, they also introduced significantly more false positives and weaker buying-intent evidence.
+
+The final pipeline therefore prioritizes Returns and Careers pages, as these consistently produced the most reliable operational signals for ClickPost's use case.
+
+---
+
 # Limitations
 
 - Uses only publicly available webpages
 - Some websites block automated scraping (HTTP 403, SSL issues)
 - Signal weights are heuristic rather than learned from historical CRM outcomes
 - ICP labels are manually curated
-- Website content may change over time
+- Website content changes over time and may affect extracted evidence
 - LLM extraction still requires deterministic verification to reduce false positives
 
 ---
@@ -354,9 +380,9 @@ ranked_accounts.json
 # Future Improvements
 
 - Retrieval-Augmented Generation (RAG) over company documentation
-- Automated regression testing using a gold-standard evaluation set
+- Automated regression testing using a gold-standard evaluation dataset
 - CRM feedback loop for learning signal weights
-- Automated ICP inference
+- Automatic ICP inference
 - Continuous monitoring of buying-intent signals
 - Interactive dashboard for SDR workflows
 
@@ -369,8 +395,13 @@ ranked_accounts.json
 AI/ML Engineer | Applied LLMs | Information Retrieval | Intelligent Automation
 
 GitHub:
-
 https://github.com/gotnochill815-web
 
-COLAB : https://colab.research.google.com/drive/18pcBM1uG5t35RWpY8OJJoiwyrUl9P09d?authuser=1#scrollTo=6QYsgU_4iiwg
+Google Colab:
+https://colab.research.google.com/drive/18pcBM1uG5t35RWpY8OJJoiwyrUl9P09d
 
+---
+
+# License
+
+This project was developed as part of the **ClickPost AI Engineer Internship Technical Assessment** and is intended for educational and portfolio purposes.
