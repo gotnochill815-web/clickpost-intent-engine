@@ -1,4 +1,4 @@
-# ClickPost Intent-Based Account Prioritization Engine
+#  Intent-Based Account Prioritization Engine
 
 An end-to-end AI-powered pipeline that identifies, verifies, ranks, and activates Direct-to-Consumer (D2C) brands based on publicly observable buying-intent signals.
 
@@ -68,7 +68,7 @@ Rather than treating every company equally, the system searches for operational 
 # Project Structure
 
 ```
-clickpost-intent-engine/
+intent-engine/
 
 ├── fetch/
 │   ├── fetch_pages.py
@@ -286,7 +286,7 @@ Grounded outbound sequences were automatically generated for accounts with verif
 Clone the repository:
 
 ```bash
-git clone https://github.com/gotnochill815-web/clickpost-intent-engine.git
+git clone https://github.com/gotnochill815-web/intent-engine.git
 
 cd clickpost-intent-engine
 ```
